@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  redis:
+    image: redis:7-alpine
+
+    ports:
+      - "6379:6379"
+
+  gateway:
+    build: ./services/gateway
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - GATEWAY_HOST=0.0.0.0
+      - GATEWAY_PORT=5000
+      - DATABASE_URL=sqlite:////data/app.db
+      - MODELS_DIR=/data/models
+    depends_on:
+      - redis
+    volumes:
+      - shared_data:/data
+
+  worker:
+    build: ./services/worker
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MODELS_DIR=/data/models
+    depends_on:
+      - redis
+    deploy:
+      replicas: 3
+    volumes:
+      - shared_data:/data
+
+  client:
+    build: ./client
+
+    depends_on:
+      - gateway
+    ports:
+      - "5173:5173"
+
+volumes:
+  shared_data:
